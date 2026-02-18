@@ -193,6 +193,9 @@ class WaterTankCard extends HTMLElement {
     this._hass = null;
     this._modalOpen = false;
     this._modalPage = "main";
+    this._modalHandlersBound = false;
+    this._overlayClickHandler = null;
+    this._modalCardInteractionHandler = null;
     this._focusAfterRender = null;
     this._toast = { open: false, text: "", type: "info" };
     this._toastTimer = null;
@@ -1699,9 +1702,23 @@ class WaterTankCard extends HTMLElement {
   _bindModalHandlers() {
     if (!this.shadowRoot) return;
 
+    const sr = this.shadowRoot;
+
     const removeHandlers = () => {
       if (this._modalEscHandler) window.removeEventListener("keydown", this._modalEscHandler);
       if (this._modalPointerHandler) document.removeEventListener("pointerdown", this._modalPointerHandler, true);
+
+      const overlay = sr.querySelector(".wt-modal-overlay");
+      if (overlay && this._overlayClickHandler) overlay.removeEventListener("click", this._overlayClickHandler);
+
+      const modalCard = sr.querySelector(".wt-modal-card");
+      if (modalCard && this._modalCardInteractionHandler) {
+        ["pointerdown", "keydown", "input", "change"].forEach((evt) => {
+          modalCard.removeEventListener(evt, this._modalCardInteractionHandler, true);
+        });
+      }
+
+      this._modalHandlersBound = false;
     };
 
     if (!this._modalOpen) {
@@ -1709,6 +1726,11 @@ class WaterTankCard extends HTMLElement {
       return;
     }
 
+    // Prevent rebinding on every render
+    if (this._modalHandlersBound) return;
+    this._modalHandlersBound = true;
+
+    // --- ESC handler (same as you already have) ---
     if (!this._modalEscHandler) {
       this._modalEscHandler = (e) => {
         if (e.key === "Escape") {
@@ -1724,6 +1746,7 @@ class WaterTankCard extends HTMLElement {
     }
     window.addEventListener("keydown", this._modalEscHandler);
 
+    // --- pointerdown handler (same as you already have) ---
     if (!this._modalPointerHandler) {
       this._modalPointerHandler = (e) => {
         if (!this._modalOpen || !this.shadowRoot) return;
@@ -1740,22 +1763,24 @@ class WaterTankCard extends HTMLElement {
     }
     document.addEventListener("pointerdown", this._modalPointerHandler, true);
 
-    const sr = this.shadowRoot;
+    // --- overlay click (bind once) ---
     const overlay = sr.querySelector(".wt-modal-overlay");
-    if (overlay) {
-      overlay.addEventListener("click", (e) => {
+    if (!this._overlayClickHandler) {
+      this._overlayClickHandler = (e) => {
         if (e.target === overlay) {
           e.stopPropagation();
           this._closeModal();
         }
-      });
+      };
     }
+    if (overlay) overlay.addEventListener("click", this._overlayClickHandler);
 
+    // --- modal interaction mark (bind once) ---
     const modalCard = sr.querySelector(".wt-modal-card");
+    if (!this._modalCardInteractionHandler) {
+      this._modalCardInteractionHandler = () => this._markInteraction();
+    }
     if (modalCard) {
-      if (!this._modalInteractionHandler) {
-        this._modalInteractionHandler = () => this._markInteraction();
-      }
       ["pointerdown", "keydown", "input", "change"].forEach((evt) => {
         modalCard.addEventListener(evt, this._modalInteractionHandler, true);
       });
@@ -3269,7 +3294,6 @@ class WaterTankCard extends HTMLElement {
     `;
 
     this.shadowRoot.innerHTML = html;
-    this._bindModalHandlers();
 
     const settingButtons = this.shadowRoot.querySelectorAll("#settingsBtn");
     settingButtons.forEach((btn) => {
@@ -3318,8 +3342,6 @@ class WaterTankCard extends HTMLElement {
       };
     }
 
-    this._bindModalHandlers();
-
     if (this._modalOpen && this.shadowRoot) {
       requestAnimationFrame(() => {
         if (!this._modalOpen || !this.shadowRoot) return;
@@ -3355,6 +3377,7 @@ class WaterTankCard extends HTMLElement {
         }
       });
     }
+    this._bindModalHandlers();
   }
 }
 
