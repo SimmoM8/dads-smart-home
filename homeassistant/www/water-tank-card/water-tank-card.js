@@ -1,10 +1,10 @@
 /* water-tank-card.js
  * Custom Home Assistant Lovelace card (no build step).
- * v0.5.0: device_id auto-resolve for one-click install.
+ * v0.5.11: minor bug fixes and improvements.
  */
 
 const CARD_TAG = "water-tank-card";
-const VERSION = "0.5.10";
+const VERSION = "0.5.11";
 
 // Toast timing (ms)
 const TOAST_RESULT_MS = 2200;
@@ -1441,8 +1441,14 @@ class WaterTankCard extends HTMLElement {
         </div>
       </div>`;
 
-    const tankValue = this._editing.tankVolume ? this._draft.tankVolume : this._state(this._config.tank_volume_entity);
-    const rodValue = this._editing.rodLength ? this._draft.rodLength : this._state(this._config.rod_length_entity);
+    const tankStateNow = this._state(this._config.tank_volume_entity);
+    const rodStateNow = this._state(this._config.rod_length_entity);
+    const tankUnset = this._isUnknownState(tankStateNow);
+    const rodUnset = this._isUnknownState(rodStateNow);
+    const tankValueRaw = this._editing.tankVolume ? this._draft.tankVolume : tankStateNow;
+    const rodValueRaw = this._editing.rodLength ? this._draft.rodLength : rodStateNow;
+    const tankValue = this._isUnknownState(tankValueRaw) ? "" : tankValueRaw;
+    const rodValue = this._isUnknownState(rodValueRaw) ? "" : rodValueRaw;
 
     const tankRow = this._config.tank_volume_entity
       ? `
@@ -1456,7 +1462,7 @@ class WaterTankCard extends HTMLElement {
               <button class="wt-btn" id="tankVolumeSave" data-entity="${this._config.tank_volume_entity}">Save</button>
             </div>
             <div class="wt-error" id="tankVolumeError"></div>
-            <div class="wt-setup-help">Used to calculate liters</div>
+            <div class="wt-setup-help">${tankUnset ? "Not set - tap to configure." : "Used to calculate liters"}</div>
           </div>
         </div>`
       : "";
@@ -1473,7 +1479,7 @@ class WaterTankCard extends HTMLElement {
               <button class="wt-btn" id="rodLengthSave" data-entity="${this._config.rod_length_entity}">Save</button>
             </div>
             <div class="wt-error" id="rodLengthError"></div>
-            <div class="wt-setup-help">Used to calculate cm</div>
+            <div class="wt-setup-help">${rodUnset ? "Not set - tap to configure." : "Used to calculate cm"}</div>
           </div>
         </div>`
       : "";
@@ -1782,7 +1788,7 @@ class WaterTankCard extends HTMLElement {
     }
     if (modalCard) {
       ["pointerdown", "keydown", "input", "change"].forEach((evt) => {
-        modalCard.addEventListener(evt, this._modalInteractionHandler, true);
+        modalCard.addEventListener(evt, this._modalCardInteractionHandler, true);
       });
     }
 
